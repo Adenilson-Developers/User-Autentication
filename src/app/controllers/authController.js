@@ -1,7 +1,10 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
 
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const mailer = require('../../modules/mailer');
+
 const authConfig = require('../../config/auth');
 
 const User = require('../models/User');
@@ -53,5 +56,51 @@ router.post('/authenticate', async (req, res ) => {
 
     });
 });
+
+router.post('/fogot_password', async(req, res) => {
+    const { email } = req.body;
+
+    try{
+
+        const user = await User.findOne({ eamil });
+
+        if(!user)
+        return res.status(400).send({ error: 'User not found'});
+
+        const token = crypto.randomBytes(20).toString('hex');
+
+        const now = new Date();
+
+        now.setHours(now.getHours() + 1);
+
+        await User.findByIdAndUpdate(user.id, {
+            '$set': {
+                passwordResetToken: token,
+                passwordResetExpires: now,
+            }
+        });
+
+        mailer.sendMail({
+            to: email,
+            from: 'adenilson.developers@gmail.com',
+            template: 'auth/fogot_password',
+            context: { token },
+        }, (err) => {
+            if(err){
+                return res.status(400).send({ error: 'Cannot send fogot password email'});
+
+                return res.send();
+            }
+        })
+
+
+
+
+
+    } catch(err){
+
+        res.status(400).send({ error: 'Error on fogot passaword, try again'});
+    }
+})
 
 module.exports = app => app.use('/auth', router);
